@@ -1,0 +1,166 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Dashboard - Gestione Giornaliere{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2>Dashboard</h2>
+        <p class="text-muted">Select an area to view work orders and manage street cleaning operations.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <a href="#" class="btn btn-success me-2" onclick="uploadStreetData()">Import Street Data</a>
+                <a href="#" class="btn btn-info me-2" onclick="uploadAreaData()">Import Area Definitions</a>
+                <a href="/admin/" class="btn btn-secondary" target="_blank">Admin Panel</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <h4>Areas</h4>
+        {% if areas %}
+            <div class="row">
+                {% for area in areas %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card area-card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ area.name }}</h5>
+                                <p class="card-text">{{ area.description|default:"No description" }}</p>
+                                <p class="text-muted small">{{ area.streets.count }} streets</p>
+                                <div class="btn-group w-100">
+                                    <a href="{% url 'area_view' area.id 'monthly' %}" class="btn btn-primary">Monthly View</a>
+                                    <a href="{% url 'area_view' area.id 'weekly' %}" class="btn btn-outline-primary">Weekly View</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                <h5>No areas found</h5>
+                <p>Start by importing area definitions using the "Import Area Definitions" button above, or add areas through the <a href="/admin/" target="_blank">Admin Panel</a>.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <h4>Cleaning Machines</h4>
+        {% if cleaning_machines %}
+            <div class="row">
+                {% for machine in cleaning_machines %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">{{ machine.name }}</h6>
+                                <p class="card-text small text-muted">{{ machine.description|default:"No description" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                <p>No cleaning machines found. Add them through the <a href="/admin/" target="_blank">Admin Panel</a>.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal for file uploads -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="uploadModalTitle">Upload Data</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" id="uploadType" name="upload_type">
+                    <div class="mb-3">
+                        <label for="excelFile" class="form-label">Excel File</label>
+                        <input type="file" class="form-control" id="excelFile" name="excel_file" accept=".xlsx,.xls" required>
+                    </div>
+                    <div id="additionalFields"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Upload</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function uploadStreetData() {
+    document.getElementById('uploadModalTitle').textContent = 'Import Street Data';
+    document.getElementById('uploadType').value = 'streets';
+    
+    const additionalFields = document.getElementById('additionalFields');
+    additionalFields.innerHTML = `
+        <div class="mb-3">
+            <label for="cleaningMachine" class="form-label">Cleaning Machine</label>
+            <select class="form-select" id="cleaningMachine" name="cleaning_machine" required>
+                <option value="">Select a cleaning machine</option>
+                {% for machine in cleaning_machines %}
+                    <option value="{{ machine.id }}">{{ machine.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    `;
+    
+    new bootstrap.Modal(document.getElementById('uploadModal')).show();
+}
+
+function uploadAreaData() {
+    document.getElementById('uploadModalTitle').textContent = 'Import Area Definitions';
+    document.getElementById('uploadType').value = 'areas';
+    document.getElementById('additionalFields').innerHTML = '';
+    
+    new bootstrap.Modal(document.getElementById('uploadModal')).show();
+}
+
+document.getElementById('uploadForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const uploadType = formData.get('upload_type');
+    
+    fetch(`/import/${uploadType}/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Upload failed: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Upload failed: ' + error);
+    });
+});
+</script>
+{% endblock %}

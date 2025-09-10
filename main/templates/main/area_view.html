@@ -1,0 +1,148 @@
+{% extends 'main/base.html' %}
+
+{% block title %}{{ area.name }} - {{ view_type|title }} View{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2>{{ area.name }}</h2>
+                <p class="text-muted">{{ view_type|title }} view from {{ start_date }} to {{ end_date }}</p>
+            </div>
+            <div>
+                <a href="{% url 'dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="btn-group" role="group">
+            <a href="{% url 'area_view' area.id 'monthly' %}" 
+               class="btn {% if view_type == 'monthly' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                Monthly View
+            </a>
+            <a href="{% url 'area_view' area.id 'weekly' %}" 
+               class="btn {% if view_type == 'weekly' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                Weekly View
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Streets in {{ area.name }}</h5>
+            </div>
+            <div class="card-body">
+                {% if streets %}
+                    <ul class="list-group list-group-flush">
+                        {% for street in streets %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ street.name }}
+                                <span class="badge bg-primary rounded-pill">
+                                    {% with street_orders=work_orders|dictsort:"street.name" %}
+                                        {% for order in street_orders %}
+                                            {% if order.street == street %}{{ order.daily_passages }}{% endif %}
+                                        {% endfor %}
+                                    {% endwith %}
+                                </span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted">No streets found in this area.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>Work Orders</h5>
+            </div>
+            <div class="card-body">
+                {% if work_orders %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Street</th>
+                                    <th>Cleaning Machine</th>
+                                    <th>Daily Passages</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in work_orders %}
+                                    <tr>
+                                        <td>{{ order.date|date:"M d, Y" }}</td>
+                                        <td>{{ order.street.name }}</td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ order.cleaning_machine.name }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">{{ order.daily_passages }}</span>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <h6>No work orders found</h6>
+                        <p class="mb-0">No work orders have been scheduled for this area in the selected time period.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if work_orders %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5>Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <h4 class="text-primary">{{ work_orders.count }}</h4>
+                            <p class="text-muted">Total Orders</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-success">
+                                {% with total_passages=0 %}
+                                    {% for order in work_orders %}
+                                        {% with total_passages=total_passages|add:order.daily_passages %}{% endwith %}
+                                    {% endfor %}
+                                    {{ total_passages }}
+                                {% endwith %}
+                            </h4>
+                            <p class="text-muted">Total Passages</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-info">
+                                {% regroup work_orders by cleaning_machine as machine_groups %}
+                                {{ machine_groups|length }}
+                            </h4>
+                            <p class="text-muted">Machines Used</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-warning">
+                                {% regroup work_orders by street as street_groups %}
+                                {{ street_groups|length }}
+                            </h4>
+                            <p class="text-muted">Streets Covered</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
