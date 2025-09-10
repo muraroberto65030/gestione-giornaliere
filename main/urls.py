@@ -10,4 +10,5 @@ urlpatterns = [
     path('area/<int:area_id>/<str:view_type>/', views.area_view, name='area_view'),
     path('import/streets/', views.import_streets, name='import_streets'),
     path('import/areas/', views.import_areas, name='import_areas'),
+    path('import/daily-activities/', views.import_daily_activities, name='import_daily_activities'),
 ]
