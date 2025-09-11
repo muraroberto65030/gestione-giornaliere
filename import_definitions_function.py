@@ -194,3 +194,39 @@ def import_area_definitions(request):
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Metodo di richiesta non valido'})
+
+
+    import openpyxl
+
+def importa_aree(filepath):
+    wb = openpyxl.load_workbook(filepath)
+    aree = {}
+
+    for sheet in wb.worksheets:
+        area = sheet['A1'].value
+        if not area:
+            continue
+        operazioni = []
+        row = 6
+        max_row = sheet.max_row
+        while row <= max_row:
+            operazione = sheet[f'A{row}'].value
+            if operazione:
+                vie = []
+                vie_row = row + 4
+                while vie_row <= max_row:
+                    via = sheet[f'A{vie_row}'].value
+                    if not via or str(via).strip() == "":
+                        break
+                    vie.append(via)
+                    vie_row += 1
+                operazioni.append({
+                    'operazione': operazione,
+                    'vie': vie
+                })
+                row = vie_row + 1
+            else:
+                row += 1
+        aree[area] = operazioni
+    return aree
+

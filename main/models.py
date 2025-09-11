@@ -58,9 +58,9 @@ class Street(models.Model):
 class StreetCleaningOperation(models.Model):
     street = models.ForeignKey(Street, on_delete=models.CASCADE, related_name='operations', verbose_name="Strada")
     operation_type = models.ForeignKey(CleaningOperationType, on_delete=models.CASCADE, verbose_name="Tipo Operazione")
-    day_of_month = models.PositiveIntegerField(verbose_name="Giorno del Mese")
-    month = models.PositiveIntegerField(verbose_name="Mese")
-    year = models.PositiveIntegerField(verbose_name="Anno")
+    day_of_month = models.PositiveIntegerField(verbose_name="Giorno del Mese", null=True, blank=True)
+    month = models.PositiveIntegerField(verbose_name="Mese", null=True, blank=True)
+    year = models.PositiveIntegerField(verbose_name="Anno", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Creata il")
     
     class Meta:

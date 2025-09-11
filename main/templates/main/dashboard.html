@@ -31,17 +31,14 @@
         <h4>Aree</h4>
         {% if areas %}
             <div class="row">
+<!-- filepath: c:\Users\murar\OneDrive\Desktop\proj\gestione-giornaliere\main\templates\main\dashboard.html -->
                 {% for area in areas %}
-                    <div class="col-md-6 col-lg-4 mb-3">
-                        <div class="card area-card">
+                    <div class="col-md-4 mb-3">
+                        <div class="card border-{{ area_status.area.id.color }}">
                             <div class="card-body">
                                 <h5 class="card-title">{{ area.name }}</h5>
-                                <p class="card-text">{{ area.description|default:"Nessuna descrizione" }}</p>
-                                <p class="text-muted small">{{ area.streets.count }} strade</p>
-                                <div class="btn-group w-100">
-                                    <a href="{% url 'area_view' area.id 'monthly' %}" class="btn btn-primary">Vista Mensile</a>
-                                    <a href="{% url 'area_view' area.id 'weekly' %}" class="btn btn-outline-primary">Vista Settimanale</a>
-                                </div>
+                                <span class="badge bg-{{ area_status.area.id.color }}">{{ area_status.area.id.label }}
+                                </span>
                             </div>
                         </div>
                     </div>

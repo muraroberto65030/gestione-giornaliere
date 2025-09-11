@@ -7,7 +7,40 @@ from django.db.models import Q
 from datetime import datetime, timedelta
 from .models import Area, Street, WorkOrder, CleaningMachine, PassagePlan, CleaningOperationType, StreetCleaningOperation
 import json
+from django.views.decorators.csrf import csrf_exempt
+import openpyxl
 
+def importa_aree(filepath):
+    wb = openpyxl.load_workbook(filepath)
+    aree = {}
+
+    for sheet in wb.worksheets:
+        area = sheet['A1'].value
+        if not area:
+            continue
+        operazioni = []
+        row = 6
+        max_row = sheet.max_row
+        while row <= max_row:
+            operazione = sheet[f'A{row}'].value
+            if operazione:
+                vie = []
+                vie_row = row + 4
+                while vie_row <= max_row:
+                    via = sheet[f'A{vie_row}'].value
+                    if not via or str(via).strip() == "":
+                        break
+                    vie.append(via)
+                    vie_row += 1
+                operazioni.append({
+                    'operazione': operazione,
+                    'vie': vie
+                })
+                row = vie_row + 1
+            else:
+                row += 1
+        aree[area] = operazioni
+    return aree
 
 def login_view(request):
     if request.method == 'POST':
@@ -27,18 +60,34 @@ def logout_view(request):
     logout(request)
     return redirect('login')
 
-
 @login_required
 def dashboard(request):
     areas = Area.objects.all()
     cleaning_machines = CleaningMachine.objects.all()
-    
+    area_status = {}
+
+    for area in areas:
+        streets = area.streets.all()
+        total_streets = streets.count()
+        streets_with_passage = streets.filter(workorder__daily_passages__gt=0).distinct().count()
+
+        if streets_with_passage == 0:
+            status = 'danger'
+            label = 'Nessun passaggio'
+        elif streets_with_passage < total_streets:
+            status = 'warning'
+            label = 'Passaggi parziali'
+        else:
+            status = 'success'
+            label = 'Tutte le vie coperte'
+        area_status[area.id] = {'color': status, 'label': label}
+
     context = {
         'areas': areas,
         'cleaning_machines': cleaning_machines,
+        'area_status': area_status,
     }
     return render(request, 'main/dashboard.html', context)
-
 
 @login_required
 def area_view(request, area_id, view_type='monthly'):
@@ -150,76 +199,44 @@ def import_streets(request):
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
-
 @login_required
 def import_areas(request):
-    if request.method == 'POST':
+    if request.method == 'POST' and request.FILES.get('excel_file'):
+        excel_file = request.FILES['excel_file']
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+            for chunk in excel_file.chunks():
+                tmp.write(chunk)
+            tmp_path = tmp.name
         try:
-            import pandas as pd
-            
-            excel_file = request.FILES.get('excel_file')
-            
-            if not excel_file:
-                return JsonResponse({'success': False, 'error': 'Missing file'})
-            
-            df = pd.read_excel(excel_file)
-            
-            required_columns = ['area_name', 'street_name']
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            if missing_columns:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Missing columns: {", ".join(missing_columns)}'
-                })
-            
-            imported_areas = 0
-            imported_streets = 0
-            errors = []
-            
-            for index, row in df.iterrows():
-                try:
-                    area_name = str(row['area_name']).strip()
-                    street_name = str(row['street_name']).strip()
-                    
-                    if not area_name or not street_name:
-                        continue
-                    
-                    area, area_created = Area.objects.get_or_create(name=area_name)
-                    if area_created:
-                        imported_areas += 1
-                    
-                    street, street_created = Street.objects.get_or_create(
-                        name=street_name,
-                        area=area
+            aree = importa_aree(tmp_path)
+            for area_name, operazioni in aree.items():
+                area_obj, _ = Area.objects.get_or_create(
+                    name=area_name,
+                    defaults={'description': f'Importata da {excel_file.name}'}
+                )
+                for op in operazioni:
+                    # Salva/aggiorna tipo operazione
+                    op_type, _ = CleaningOperationType.objects.get_or_create(
+                        name=op['operazione'],
+                        defaults={'description': f'Importata da {excel_file.name}'}
                     )
-                    if street_created:
-                        imported_streets += 1
-                    
-                except Exception as e:
-                    errors.append(f"Row {index + 1}: {str(e)}")
-            
-            if errors:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Imported {imported_areas} areas and {imported_streets} streets with errors: {"; ".join(errors[:5])}'
-                })
-            
-            return JsonResponse({
-                'success': True,
-                'message': f'Successfully imported {imported_areas} areas and {imported_streets} streets'
-            })
-            
-        except ImportError:
-            return JsonResponse({
-                'success': False,
-                'error': 'pandas library is required for Excel import. Please install it.'
-            })
+                    for via_name in op['vie']:
+                        if via_name and via_name.strip():
+                            street_obj, _ = Street.objects.get_or_create(
+                                name=via_name.strip(),
+                                area=area_obj
+                            )
+                            # Collega la strada al tipo di operazione se serve (ad esempio con un modello intermedio)
+                            StreetCleaningOperation.objects.get_or_create(
+                                street=street_obj,
+                                operation_type=op_type
+                            )
+            return JsonResponse({'success': True, 'imported_areas': list(aree.keys())})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': 'File non ricevuto'})
     
-    return JsonResponse({'success': False, 'error': 'Invalid request method'})
-
-
 @login_required
 def import_daily_activities(request):
     """Import daily activities from Excel file with Italian format"""
