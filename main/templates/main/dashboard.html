@@ -26,32 +26,59 @@
     </div>
 </div>
 
-<div class="row">
-    <div class="col-12">
-        <h4>Aree</h4>
-        {% if areas %}
-            <div class="row">
 <!-- filepath: c:\Users\murar\OneDrive\Desktop\proj\gestione-giornaliere\main\templates\main\dashboard.html -->
-                {% for area in areas %}
-                    <div class="col-md-4 mb-3">
-                        <div class="card border-{{ area_status.area.id.color }}">
-                            <div class="card-body">
-                                <h5 class="card-title">{{ area.name }}</h5>
-                                <span class="badge bg-{{ area_status.area.id.color }}">{{ area_status.area.id.label }}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="alert alert-info">
-                <h5>Nessuna area trovata</h5>
-                <p>Inizia importando le definizioni delle aree usando il pulsante "Importa Definizioni Aree" sopra, o aggiungi aree tramite il <a href="/admin/" target="_blank">Pannello Admin</a>.</p>
-            </div>
-        {% endif %}
-    </div>
-</div>
+<form method="get" class="mb-3 d-flex align-items-center gap-2">
+    <label for="month" class="form-label mb-0">Mese:</label>
+  <select name="month" id="month" class="form-select w-auto" onchange="this.form.submit()">
+    {% for m in months %}
+        <option value="{{ m }}" {% if m == selected_month %}selected{% endif %}>{{ m }}</option>
+    {% endfor %}
+</select>
+    <label for="year" class="form-label mb-0">Anno:</label>
+  <select name="year" id="year" class="form-select w-auto" onchange="this.form.submit()">
+    {% for y in years %}
+        <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+    {% endfor %}
+</select>
+</form>
+
+<table class="table table-bordered align-middle">
+    <thead class="table-light">
+        <tr>
+            <th>Area</th>
+            <th>Stato</th>
+            <th>Riepilogo settimanale</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for area in areas %}
+        <tr>
+            <td>{{ area.name }}</td>
+            <td>
+                <span class="badge bg-{{ area_status.area.id.color }}">
+                    {{ area_status.area.id.label }}
+                </span>
+            </td>
+            <td>
+                <ul class="mb-0">
+                    {% for week in area_summary.area.id %}
+                        <li>
+                            <strong>{{ week.week }}</strong>: {{ week.count }} lavorazioni
+                            {% if week.count > 0 %}
+                                <ul>
+                                    {% for wo in week.details %}
+                                        <li>{{ wo.street.name }} - {{ wo.cleaning_machine.name }} ({{ wo.date|date:"d/m/Y" }})</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 
 <div class="row mt-4">
     <div class="col-12">

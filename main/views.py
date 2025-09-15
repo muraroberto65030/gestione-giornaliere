@@ -9,6 +9,8 @@ from .models import Area, Street, WorkOrder, CleaningMachine, PassagePlan, Clean
 import json
 from django.views.decorators.csrf import csrf_exempt
 import openpyxl
+from calendar import monthrange
+
 
 def importa_aree(filepath):
     wb = openpyxl.load_workbook(filepath)
@@ -60,16 +62,34 @@ def logout_view(request):
     logout(request)
     return redirect('login')
 
+
 @login_required
 def dashboard(request):
     areas = Area.objects.all()
     cleaning_machines = CleaningMachine.objects.all()
     area_status = {}
+    today = datetime.today()
+    selected_year = int(request.GET.get('year', today.year))
+    selected_month = int(request.GET.get('month', today.month))
 
+    # Calcolo settimane del mese selezionato
+    first_day = datetime(selected_year, selected_month, 1)
+    last_day = datetime(selected_year, selected_month, monthrange(selected_year, selected_month)[1])
+    weeks = []
+    week_start = first_day
+    while week_start <= last_day:
+        week_end = week_start + timedelta(days=6)
+        if week_end > last_day:
+            week_end = last_day
+        weeks.append({'start': week_start, 'end': week_end})
+        week_start = week_end + timedelta(days=1)
+
+    # Stato aree e riepilogo lavorazioni
+    area_summary = {}
     for area in areas:
         streets = area.streets.all()
         total_streets = streets.count()
-        streets_with_passage = streets.filter(workorder__daily_passages__gt=0).distinct().count()
+        streets_with_passage = streets.filter(workorder__date__month=selected_month, workorder__date__year=selected_year, workorder__daily_passages__gt=0).distinct().count()
 
         if streets_with_passage == 0:
             status = 'danger'
@@ -82,10 +102,30 @@ def dashboard(request):
             label = 'Tutte le vie coperte'
         area_status[area.id] = {'color': status, 'label': label}
 
+        # Riepilogo lavorazioni per settimana
+        summary = []
+        for week in weeks:
+            workorders = WorkOrder.objects.filter(
+                street__area=area,
+                date__range=[week['start'], week['end']]
+            )
+            summary.append({
+                'week': f"{week['start'].strftime('%d/%m')} - {week['end'].strftime('%d/%m')}",
+                'count': workorders.count(),
+                'details': workorders
+            })
+        area_summary[area.id] = summary
+
     context = {
         'areas': areas,
         'cleaning_machines': cleaning_machines,
         'area_status': area_status,
+        'area_summary': area_summary,
+        'selected_year': selected_year,
+        'years': range(selected_year - 2, selected_year + 3), 
+        'selected_month': selected_month,
+        'months': range(1, 13),
+        'weeks': weeks,
     }
     return render(request, 'main/dashboard.html', context)
 
